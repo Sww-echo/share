@@ -44,7 +44,8 @@ there is no easy way to retrieve the feed (you can get it back from the
 recover the secret from `config.json` if it happens.
 - Security could probably be improved, tokens and PINs are stored in clear on
 the filesystem
-- No rate control or capacity limits, quite exposed to flooding as it is
+- No rate control, so it is still exposed to flooding; upload size and
+  retained data size can be configured with environment variables.
 
 ### Environment variables
 | Variable name | Description |
@@ -52,7 +53,8 @@ the filesystem
 | `YBF_DATA_DIR` | points to an alternative direcotry to store data, default is `./data/` in current directory. |
 | `YBF_HTTP_PORT` | TCP port to run the server, default is `8080`. |
 | `YBF_LISTEN_ADDR` | IP address to bind, default is `0.0.0.0`. |
-| ` YBF_MAX_UPLOAD_SIZE` | Maximum size for added items an files, default is 5MB. |
+| `YBF_MAX_UPLOAD_SIZE` | Maximum size for added items and files, default is 5MB. |
+| `YBF_MAX_DATA_SIZE` | Maximum retained feed item data in MiB, default is 1024 (1 GiB). The oldest items are removed when the limit is exceeded; `0` disables automatic cleanup. |
 
 ### Installation
 
@@ -88,7 +90,15 @@ docker compose up -d --build
 ```
 
 The application is available at `http://localhost:8080/` and persists feed
-data in the local `data/` directory. Stop it with `docker compose down`.
+data in the local `data/` directory. By default, when retained feed items
+exceed 1 GiB, the oldest items are removed automatically. You can change the
+quota, in MiB, when starting Compose, for example:
+
+```
+YBF_MAX_DATA_SIZE=2048 docker compose up -d --build
+```
+
+Stop it with `docker compose down`.
 
 To use it from a phone, connect the phone and the host computer to the same
 Wi-Fi network, then open `http://<host-lan-ip>:8080/` on the phone. On the

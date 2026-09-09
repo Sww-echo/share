@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v2"
+	"github.com/ybizeul/ybfeed/internal/feed"
 	"github.com/ybizeul/ybfeed/internal/handlers"
 	"golang.org/x/exp/slog"
 )
@@ -13,6 +14,7 @@ var LISTEN_ADDR string
 var DEBUG bool
 var dataDir string
 var maxBodySize int
+var maxDataSize int
 
 var logLevel slog.LevelVar
 
@@ -62,6 +64,13 @@ func main() {
 				Usage:       "Max upload size in MB",
 				Destination: &maxBodySize,
 			},
+			&cli.IntFlag{
+				Name:        "max-data-size",
+				EnvVars:     []string{"YBF_MAX_DATA_SIZE"},
+				Value:       int(feed.DefaultMaxDataSize / (1024 * 1024)),
+				Usage:       "Maximum retained feed item data in MiB; oldest items are removed after the limit is reached",
+				Destination: &maxDataSize,
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel}))
@@ -91,8 +100,15 @@ func run() {
 	}
 	api.Version = version
 	api.MaxBodySize = maxBodySize * 1024 * 1024
+	api.MaxDataSize = int64(maxDataSize) * 1024 * 1024
 	api.HttpPort = HTTP_PORT
 	api.ListenAddr = LISTEN_ADDR
+
+	if removed, err := api.FeedManager.EnforceStorageLimit(api.MaxDataSize); err != nil {
+		slog.Error("Unable to enforce storage quota at startup", slog.String("error", err.Error()))
+	} else if removed > 0 {
+		slog.Info("Storage quota cleanup completed at startup", slog.Int("removed-items", removed))
+	}
 
 	api.StartServer()
 }

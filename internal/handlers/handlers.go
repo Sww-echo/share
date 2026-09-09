@@ -78,6 +78,7 @@ type ApiHandler struct {
 	BasePath         string
 	Version          string
 	MaxBodySize      int
+	MaxDataSize      int64
 	Config           APIConfig
 	HttpPort         int
 	ListenAddr       string
@@ -134,6 +135,7 @@ func NewApiHandler(basePath string) (*ApiHandler, error) {
 	result := &ApiHandler{
 		BasePath:         basePath,
 		Config:           *config,
+		MaxDataSize:      feed.DefaultMaxDataSize,
 		FeedManager:      fm,
 		WebSocketManager: &ws,
 	}
@@ -207,7 +209,8 @@ func (api *ApiHandler) GetServer() *chi.Mux {
 		slog.String("data_dir", api.BasePath),
 		slog.Int("port", api.HttpPort),
 		slog.String("address", api.ListenAddr),
-		slog.Int("max-upload-size", api.MaxBodySize))
+		slog.Int("max-upload-size", api.MaxBodySize),
+		slog.Int64("max-data-size", api.MaxDataSize))
 
 	return r
 }
@@ -491,6 +494,12 @@ func (api *ApiHandler) feedPostFunc(w http.ResponseWriter, r *http.Request) {
 			utils.CloseWithCodeAndMessage(w, 500, err.Error())
 		}
 		return
+	}
+
+	if removed, cleanupErr := api.FeedManager.EnforceStorageLimit(api.MaxDataSize); cleanupErr != nil {
+		hL.Logger.Error("Unable to enforce storage quota after upload", slog.String("error", cleanupErr.Error()))
+	} else if removed > 0 {
+		hL.Logger.Info("Storage quota cleanup completed after upload", slog.Int("removed-items", removed))
 	}
 
 	if _, err := w.Write([]byte("OK")); err != nil {

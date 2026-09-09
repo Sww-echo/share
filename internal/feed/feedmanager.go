@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 
 	"golang.org/x/exp/slog"
 )
@@ -16,6 +17,7 @@ type FeedManager struct {
 
 	path             string
 	websocketManager *WebSocketManager
+	storageMu        sync.Mutex
 }
 
 // NewFeedManager returns a FeedManager initialized with the mandatory
