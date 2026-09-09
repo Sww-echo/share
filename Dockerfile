@@ -1,7 +1,7 @@
 FROM node AS node
 WORKDIR /app/web/ui
 ADD web/ui/package.json web/ui/package-lock.json ./
-RUN npm install;
+RUN npm install --legacy-peer-deps --no-audit --no-fund;
 ADD web/ui/ .
 RUN npm run build
 

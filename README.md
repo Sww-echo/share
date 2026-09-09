@@ -79,6 +79,24 @@ docker compose up -d
 
 You can now point your browser to http://localhost:8080/
 
+#### Local Docker Compose deployment
+
+From the repository root, run:
+
+```
+docker compose up -d --build
+```
+
+The application is available at `http://localhost:8080/` and persists feed
+data in the local `data/` directory. Stop it with `docker compose down`.
+
+To use it from a phone, connect the phone and the host computer to the same
+Wi-Fi network, then open `http://<host-lan-ip>:8080/` on the phone. On the
+feed page, tap the paste box and choose **Paste** from the mobile keyboard or
+system menu. The native paste event supports both plain text and images over
+the local HTTP URL; the **从剪贴板上传** button uses the asynchronous Clipboard
+API when the browser grants clipboard access (usually HTTPS or localhost).
+
 ### Building
 
 #### Using Makefile
