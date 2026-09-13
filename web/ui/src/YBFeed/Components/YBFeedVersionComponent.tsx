@@ -1,31 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Text, Skeleton, Center } from "@mantine/core"
-
+import { useEffect, useState } from 'react';
 export function YBFeedVersionComponent() {
-        const [version, setVersion] = useState<undefined|string>(undefined)
-        useEffect(() => {
-            fetch("/api")
-            .then(r => {
-                const v = r.headers.get("Ybfeed-Version")
-                if (v !== null && v !== "") {
-                    setVersion(v)
-                } else {
-                    setVersion("Unknown")
-                }
-            })
-            .catch(e => {
-                console.log(e)
-            })
-        },[])
-        return (
-            <>
-            {!version?
-                <Center>
-                    <Skeleton mb="1em" width="10em" height="5"/>
-                </Center>
-            :
-                <Text pb="1em" size="0.7em" c={"gray"} ta="center">ybFeed {version}</Text>
-            }
-            </>
-        )
+  const [version, setVersion] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api', { signal: controller.signal })
+      .then((response) => setVersion(response.headers.get('Ybfeed-Version') || ''))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  return <span>{version && version !== 'Unknown' ? '版本 ' + version : '文本 / 图片 / 文件'}</span>;
 }

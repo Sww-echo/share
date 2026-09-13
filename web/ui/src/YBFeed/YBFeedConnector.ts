@@ -1,6 +1,7 @@
 import { AxiosResponseHeaders } from 'axios'
 import { YBFeed, YBFeedItem, YBFeedError } from '.'
 import { Y } from '../YBFeedClient'
+import { errorStatus, itemURL } from './feedback'
 
 class YBFeedConnector {
     feedUrl(feedName: string): string {
@@ -25,115 +26,21 @@ class YBFeedConnector {
             .catch((e)=>reject(e))
         })
     }
-    async GetFeed(feedName: string): Promise<YBFeed|null> { 
-        return new Promise((resolve, reject) => {
-            Y.get('/feeds/' + encodeURIComponent(feedName))
-            .then((f) => {
-                resolve(f as YBFeed)
-            })
-            // .then((f) => {
-            //     if (f) {
-            //         const result = f as YBFeed
-            //         // f.vapidpublickey = f.vapidpublickey
-            //         // for (let i=0;i<f.items.length;i++) {
-            //         //     result.items[i].feed = f
-            //         // }
-            //         resolve(result)
-            //     }
-            // })
-            .catch((e) => {
-                console.log(e)
-                reject(new YBFeedError(e.status, "Server Unavailable"))
-            })
-
-            // fetch(this.feedUrl(feedName),{
-            //         credentials: "include"
-            // })
-            // .then((f) => {
-            //     if (f.ok) {
-            //         return f.json()
-            //     }
-            //     else {
-            //         reject(new YBFeedError(f.status, "Server Error: " + f.statusText))
-            //     }
-            // })
-            // .then((f) => {
-            //     const result = f
-            //     result.vapidpublickey = f.vapidpublickey
-            //     for (let i=0;i<f.items.length;i++) {
-            //         result.items[i].feed = f
-            //     }
-            //     resolve(result)
-            // })
-            // .catch((e) => {
-            //     reject(new YBFeedError(e.status, "Server Unavailable"))
-            // })
-        })
+    async GetFeed(feedName: string, secret?: string): Promise<YBFeed> {
+        try {
+            const query = secret ? '?secret=' + encodeURIComponent(secret) : ''
+            return await Y.get('/feeds/' + encodeURIComponent(feedName) + query) as YBFeed
+        } catch (error) {
+            throw new YBFeedError(errorStatus(error) ?? 0, '暂时无法打开空间，请稍后重试。')
+        }
     }
-    async AuthenticateFeed(feedName: string, secret: string): Promise<string|YBFeedError> {
-        return new Promise((resolve, reject) => {
-            Y.get('/feeds/' + encodeURIComponent(feedName) + "?secret=" + encodeURIComponent(secret))
-            .then((f) => {
-                const fe = f as YBFeed
-                if (fe.secret) {
-                    resolve(fe.secret)
-                }
-            })
-            .catch((error) => {
-                if (error.status === 401) {
-                    reject(new YBFeedError(401, "Unauthorized"))
-                } else {
-                    reject(new YBFeedError(error.status, "Server Unavailable"))
-                }
-            })
-
-            // fetch(this.feedUrl(feedName)+"?secret="+encodeURIComponent(secret),{
-            //     credentials: "include"
-            // })
-            // .then(f => {
-            //     if (f.status !== 200) {
-            //         f.text()
-            //         .then(text => {
-            //             reject(new YBFeedError(f.status, text))
-            //         })
-            //         .catch(() => {
-            //             reject(new YBFeedError(f.status, "Server Unavailable"))
-            //         })
-            //     } else {
-            //         f.json()
-            //         .then((j) => {
-            //             resolve(j.secret)
-            //         })
-            //     }
-            // })
-        })
+    async AuthenticateFeed(feedName: string, secret: string): Promise<string> {
+        const feed = await this.GetFeed(feedName, secret)
+        if (!feed.secret) throw new YBFeedError(401, 'PIN 不正确或已过期。')
+        return feed.secret
     }
     async GetItem(item: YBFeedItem): Promise<string> {
-        return new Promise((resolve, reject) => {
-            Y.get('/feeds/' + encodeURIComponent(item.feed.name) + "/items/" + item.name)
-            .then((i) => {
-                resolve(i as string)
-            })
-            .catch((error) => {
-                reject(new YBFeedError(error.status, "Error while getting item"))
-            })
-
-            // fetch(this.feedUrl(item.feed.name)+"/items/"+item.name,{
-            //     credentials: "include"
-            // })
-            // .then(r => {
-            //     if (r.status !== 200) {
-            //         reject(new YBFeedError(r.status, "Error while getting item"))
-            //     }
-            //     r.text()
-            //     .then(t => {
-            //         resolve(t)
-            //     })
-            //     .catch(e => {
-            //         reject(new YBFeedError(e.status, "Error while getting item"))
-            //     })
-            // })
-        })
+        return Y.request({ url: itemURL(item.feed.name, item.name), method: 'GET', responseType: 'text' })
     }
     async DeleteItem(item: YBFeedItem) {
         return new Promise((resolve, reject) => {
