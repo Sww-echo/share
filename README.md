@@ -58,13 +58,17 @@ the filesystem
 
 ### Installation
 
-#### Using Docker registry
+#### Using the GitHub Container Registry image
 
-Use this method to treat youself with a quick demo of the most current version
+The repository automatically builds and publishes a multi-architecture image to
+GitHub Container Registry when changes are pushed to `main` or a `v*` tag.
 
 ```
 mkdir data
-docker run -p 8080:8080 -v $(pwd)/data:/data ghcr.io/ybizeul/ybfeed:latest
+docker run -d --name share \
+  -p 8080:8080 \
+  -v $(pwd)/data:/data \
+  ghcr.io/sww-echo/share:latest
 ```
 
 You can now point your browser to http://localhost:8080/
@@ -74,8 +78,8 @@ You can now point your browser to http://localhost:8080/
 Use this method if you're interested by the code and hacking around
 
 ```
-git clone https://github.com/ybizeul/ybFeed.git
-cd ybFeed
+git clone https://github.com/Sww-echo/share.git
+cd share
 docker compose up -d
 ```
 
