@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActionIcon, Button, Group, Menu, Modal, Skeleton, Stack } from '@mantine/core';
-import { IconArrowLeft, IconChevronRight, IconDots, IconHash, IconRefresh, IconShare2, IconTrash, IconWifiOff } from '@tabler/icons-react';
+import { ActionIcon, Alert, Button, Group, Menu, Modal, Skeleton, Stack } from '@mantine/core';
+import { IconAlertTriangle, IconArrowLeft, IconChevronRight, IconDots, IconHash, IconRefresh, IconShare2, IconTrash, IconWifiOff } from '@tabler/icons-react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { YBPasteCardComponent } from './Components/YBPasteCardComponent';
 import { YBFeedItemsComponent } from './Components/YBFeedItemsComponent';
@@ -11,8 +11,44 @@ import { ShareModal } from './Components/ShareModal';
 import { Connector } from './YBFeedConnector';
 import type { YBFeed } from './YBFeed';
 import { errorMessage, errorStatus } from './feedback';
+import { Y } from '../YBFeedClient';
 
 const statusLabels: Record<ConnectionStatus, string> = { connecting: '正在连接', live: '实时同步中', polling: '定时同步中', offline: '连接已中断' };
+
+interface StorageInfo {
+  maxDataSize?: number;
+  dataSize?: number;
+}
+
+const formatGiB = (bytes: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(bytes / 1024 ** 3);
+
+function StorageQuotaNotice() {
+  const [info, setInfo] = useState<StorageInfo | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      Y.get('/infos').then((value) => {
+        const next = value as StorageInfo;
+        if (active && typeof next.maxDataSize === 'number' && typeof next.dataSize === 'number') setInfo(next);
+      }).catch(() => {});
+    };
+    const refresh = () => load();
+    load();
+    const timer = window.setInterval(load, 30000);
+    window.addEventListener('ybfeed:refresh', refresh);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('ybfeed:refresh', refresh);
+    };
+  }, []);
+
+  if (!info?.maxDataSize || info.maxDataSize <= 0 || (info.dataSize || 0) < info.maxDataSize * 0.8) return null;
+  return <Alert className="storage-quota-notice" color="yellow" variant="light" icon={<IconAlertTriangle size={18} />} title="存储空间接近上限">
+    已使用 {formatGiB(info.dataSize || 0)} GiB / {formatGiB(info.maxDataSize)} GiB。达到上限后，系统会自动清理最早的内容。
+  </Alert>;
+}
 
 export function YBFeedFeed() {
   const { feedName } = useParams();
@@ -75,6 +111,7 @@ function FeedWorkspace({ feedName }: { feedName: string }) {
     try {
       await Connector.EmptyFeed(feedName);
       setClearVersion((value) => value + 1);
+      window.dispatchEvent(new CustomEvent('ybfeed:refresh', { detail: feedName }));
       setConfirmEmpty(false);
     } catch (error) { setEmptyError(errorMessage(error, '清空没有完成，请稍后重试。')); }
     finally { setEmptying(false); }
@@ -103,6 +140,7 @@ function FeedWorkspace({ feedName }: { feedName: string }) {
           </Menu>
         </div>
       </div>
+      <StorageQuotaNotice />
       <YBPasteCardComponent />
       <YBFeedItemsComponent feedName={feedName} secret={feed.secret} initialItems={feed.items || []} onCountChange={setCount} onStatusChange={setConnection} onUnauthorized={unauthorized} clearVersion={clearVersion} />
       <ShareModal opened={sharing} onClose={() => setSharing(false)} feedName={feedName} secret={feed.secret} />

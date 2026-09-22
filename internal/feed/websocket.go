@@ -1,7 +1,6 @@
 package feed
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -77,43 +76,23 @@ func (m *WebSocketManager) FeedSocketsForFeed(feedName string) *FeedSockets {
 // RunSocketForFeed promotes an HTTP connection to a websocket and starts
 // waiting for data. This function is blocking and typically runs from
 // a http handler.
-func (m *WebSocketManager) RunSocketForFeed(feedName string, w http.ResponseWriter, r *http.Request) {
-	// Check if we already have websockets for this feed
-	feedSockets := m.FeedSocketsForFeed(feedName)
-
-	if feedSockets == nil { // No, then we create a new FeedSockets
-		wsL.Logger.Debug("Adding FeedSockets", slog.Int("count_before", len(m.FeedSockets)), slog.String("feedName", feedName))
-		feedSockets = &FeedSockets{
-			feedName: feedName,
-		}
-		m.FeedSockets = append(m.FeedSockets, feedSockets)
-	}
-
+func (m *WebSocketManager) RunSocketForFeed(feedName string, f *Feed, w http.ResponseWriter, r *http.Request) {
 	// Upgrade http connection to websocket
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		utils.CloseWithCodeAndMessage(w, 500, "Unable to upgrade WebSocket")
+		return
 	}
 
+	// Authentication is performed by the HTTP handler before the upgrade. Keep
+	// using that Feed instance so a config rewrite cannot make a valid socket
+	// fail a second, time-of-check/time-of-use validation.
+	feedSockets := m.FeedSocketsForFeed(feedName)
+	if feedSockets == nil {
+		wsL.Logger.Debug("Adding FeedSockets", slog.Int("count_before", len(m.FeedSockets)), slog.String("feedName", feedName))
+		feedSockets = &FeedSockets{feedName: feedName}
+		m.FeedSockets = append(m.FeedSockets, feedSockets)
+	}
 	feedSockets.websockets = append(feedSockets.websockets, c)
-
-	// Get provided secret and validate feed access
-	secret, _ := utils.GetSecret(r)
-
-	f, err := m.FeedManager.GetFeedWithAuth(feedName, secret)
-
-	if err != nil {
-		switch {
-		case errors.Is(err, FeedErrorNotFound):
-			utils.CloseWithCodeAndMessage(w, 404, "feed not found")
-		case errors.Is(err, FeedErrorInvalidSecret):
-			utils.CloseWithCodeAndMessage(w, 401, "invalid secret")
-		case errors.Is(err, FeedErrorIncorrectSecret):
-			utils.CloseWithCodeAndMessage(w, 401, "incorrect secret")
-		default:
-			utils.CloseWithCodeAndMessage(w, 500, err.Error())
-		}
-	}
 
 	// Cleanup
 	defer func() {

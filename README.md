@@ -54,7 +54,7 @@ the filesystem
 | `YBF_HTTP_PORT` | TCP port to run the server, default is `8080`. |
 | `YBF_LISTEN_ADDR` | IP address to bind, default is `0.0.0.0`. |
 | `YBF_MAX_UPLOAD_SIZE` | Maximum size for added items and files, default is 5MB. |
-| `YBF_MAX_DATA_SIZE` | Maximum retained feed item data in MiB, default is 1024 (1 GiB). The oldest items are removed when the limit is exceeded; `0` disables automatic cleanup. |
+| `YBF_MAX_DATA_SIZE` | Maximum retained feed item data in MiB, default is 10240 (10 GiB). The oldest items are removed when the limit is exceeded; the web UI warns at 80% usage; `0` disables automatic cleanup. |
 
 ### Installation
 
@@ -95,7 +95,8 @@ docker compose up -d --build
 
 The application is available at `http://localhost:8080/` and persists feed
 data in the local `data/` directory. By default, when retained feed items
-exceed 1 GiB, the oldest items are removed automatically. You can change the
+exceed 10 GiB, the oldest items are removed automatically. The web UI warns
+when usage reaches 8 GiB by default. You can change the
 quota, in MiB, when starting Compose, for example:
 
 ```

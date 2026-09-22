@@ -129,6 +129,7 @@ export function YBFeedItemsComponent({ feedName, secret, initialItems, onCountCh
   const deleteItem = async (item: YBFeedItem) => {
     await Connector.DeleteItem(item);
     setItems((previous) => previous.filter((existing) => existing.name !== item.name));
+    window.dispatchEvent(new CustomEvent('ybfeed:refresh', { detail: feedName }));
   };
   const visibleItems = filter === 'all' ? items : items.filter((item) => item.type === filter);
   const filters = [{ value: 'all' as const, label: '全部' }, { value: 0, label: '文本' }, { value: 1, label: '图片' }, { value: 2, label: '文件' }];

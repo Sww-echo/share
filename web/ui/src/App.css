@@ -189,6 +189,7 @@ button { touch-action: manipulation; }
 .empty-state p { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 0; }
 .feed-end { margin: 23px 0 0; text-align: center; font-size: 11px; color: var(--faint); display: flex; align-items: center; justify-content: center; gap: 6px; }
 .offline-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); margin-bottom: 16px; color: var(--muted); font-size: 12px; }
+.storage-quota-notice { margin-bottom: 16px; }
 .share-description { font-size: 13px; color: var(--muted); line-height: 1.8; margin: 0 0 22px; }
 .share-panel { padding-top: 23px; }
 .share-panel h3 { font-size: 14px; font-weight: 550; margin: 0 0 8px; }

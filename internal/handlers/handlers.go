@@ -216,19 +216,27 @@ func (api *ApiHandler) GetServer() *chi.Mux {
 }
 
 func (api *ApiHandler) getInfosHandler(w http.ResponseWriter, r *http.Request) {
+	dataSize, err := api.FeedManager.StorageUsage()
+	if err != nil {
+		utils.CloseWithCodeAndMessage(w, http.StatusInternalServerError, "Unable to read storage usage")
+		return
+	}
 	result := struct {
 		Version     string `json:"version"`
 		MaxBodySize int    `json:"maxBodySize"`
+		MaxDataSize int64  `json:"maxDataSize"`
+		DataSize    int64  `json:"dataSize"`
 	}{
 		Version:     api.Version,
 		MaxBodySize: api.MaxBodySize,
+		MaxDataSize: api.MaxDataSize,
+		DataSize:    dataSize,
 	}
 
 	_ = json.NewEncoder(w).Encode(result)
 }
 
 func (api *ApiHandler) feedWSHandler(w http.ResponseWriter, r *http.Request) {
-
 	secret, _ := utils.GetSecret(r)
 
 	feedName, _ := url.QueryUnescape(chi.URLParam(r, "feedName"))
@@ -238,29 +246,32 @@ func (api *ApiHandler) feedWSHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := api.FeedManager.GetFeedWithAuth(feedName, secret)
+	f, err := api.FeedManager.GetFeedWithAuth(feedName, secret)
 
 	if err != nil {
 		// A web socket doesn't have a standard http status code, so we need
 		// to open it and close it with a relevant code
 		var upgrader = ws.Upgrader{}
-		c, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
+		c, upgradeErr := upgrader.Upgrade(w, r, nil)
+		if upgradeErr != nil {
 			return
 		}
+		closeCode := http.StatusInternalServerError + 4000
 		switch {
 		case errors.Is(err, feed.FeedErrorNotFound):
-			_ = c.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(http.StatusNotFound+4000, ""), time.Now().Add(time.Second))
-		case errors.Is(err, feed.FeedErrorInvalidSecret):
-			_ = c.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(http.StatusUnauthorized+4000, ""), time.Now().Add(time.Second))
-		default:
-			_ = c.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(http.StatusInternalServerError+4000, ""), time.Now().Add(time.Second))
+			closeCode = http.StatusNotFound + 4000
+		case errors.Is(err, feed.FeedErrorInvalidSecret),
+			errors.Is(err, feed.FeedErrorIncorrectSecret),
+			errors.Is(err, feed.FeedConfigErrorPinExpired),
+			errors.Is(err, feed.FeedConfigErrorPinIncorrect):
+			closeCode = http.StatusUnauthorized + 4000
 		}
+		_ = c.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(closeCode, ""), time.Now().Add(time.Second))
 		c.Close()
 		return
 	}
 
-	api.WebSocketManager.RunSocketForFeed(feedName, w, r)
+	api.WebSocketManager.RunSocketForFeed(feedName, f, w, r)
 }
 
 func (api *ApiHandler) feedGetFunc(w http.ResponseWriter, r *http.Request) {
@@ -296,7 +307,10 @@ func (api *ApiHandler) feedGetFunc(w http.ResponseWriter, r *http.Request) {
 		err = f.IsSecretValid(secret)
 		if err != nil {
 			switch {
-			case errors.Is(err, feed.FeedErrorInvalidSecret) || errors.Is(err, feed.FeedConfigErrorPinExpired):
+			case errors.Is(err, feed.FeedErrorInvalidSecret),
+				errors.Is(err, feed.FeedErrorIncorrectSecret),
+				errors.Is(err, feed.FeedConfigErrorPinExpired),
+				errors.Is(err, feed.FeedConfigErrorPinIncorrect):
 				utils.CloseWithCodeAndMessage(w, 401, "Unauthorized")
 			default:
 				utils.CloseWithCodeAndMessage(w, 500, err.Error())

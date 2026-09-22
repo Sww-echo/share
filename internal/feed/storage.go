@@ -12,8 +12,8 @@ import (
 )
 
 // DefaultMaxDataSize is the maximum amount of feed item data retained by a
-// deployment when no override is configured. It is one GiB.
-const DefaultMaxDataSize int64 = 1 << 30
+// deployment when no override is configured. It is ten GiB.
+const DefaultMaxDataSize int64 = 10 << 30
 
 type storageItem struct {
 	feedName string
@@ -21,6 +21,59 @@ type storageItem struct {
 	path     string
 	size     int64
 	modTime  time.Time
+}
+
+func (m *FeedManager) storageSnapshot() ([]storageItem, int64, error) {
+	entries, err := os.ReadDir(m.path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("cannot read data directory: %w", err)
+	}
+
+	items := make([]storageItem, 0)
+	var total int64
+	for _, feedEntry := range entries {
+		if !feedEntry.IsDir() {
+			continue
+		}
+
+		feedPath := filepath.Join(m.path, feedEntry.Name())
+		feedItems, err := os.ReadDir(feedPath)
+		if err != nil {
+			return nil, 0, fmt.Errorf("cannot read feed %q: %w", feedEntry.Name(), err)
+		}
+
+		for _, itemEntry := range feedItems {
+			if isFeedMetadataFile(itemEntry.Name()) || !itemEntry.Type().IsRegular() {
+				continue
+			}
+
+			info, err := itemEntry.Info()
+			if err != nil {
+				return nil, 0, fmt.Errorf("cannot stat feed item %q: %w", itemEntry.Name(), err)
+			}
+
+			item := storageItem{
+				feedName: feedEntry.Name(),
+				itemName: itemEntry.Name(),
+				path:     filepath.Join(feedPath, itemEntry.Name()),
+				size:     info.Size(),
+				modTime:  info.ModTime(),
+			}
+			items = append(items, item)
+			total += item.size
+		}
+	}
+	return items, total, nil
+}
+
+// StorageUsage returns the total size of retained feed items. Feed
+// configuration and authentication files are intentionally excluded.
+func (m *FeedManager) StorageUsage() (int64, error) {
+	m.storageMu.Lock()
+	defer m.storageMu.Unlock()
+
+	_, total, err := m.storageSnapshot()
+	return total, err
 }
 
 // EnforceStorageLimit removes the oldest feed items until the total content
@@ -36,44 +89,9 @@ func (m *FeedManager) EnforceStorageLimit(limit int64) (int, error) {
 	m.storageMu.Lock()
 	defer m.storageMu.Unlock()
 
-	entries, err := os.ReadDir(m.path)
+	items, total, err := m.storageSnapshot()
 	if err != nil {
-		return 0, fmt.Errorf("cannot read data directory: %w", err)
-	}
-
-	items := make([]storageItem, 0)
-	var total int64
-	for _, feedEntry := range entries {
-		if !feedEntry.IsDir() {
-			continue
-		}
-
-		feedPath := filepath.Join(m.path, feedEntry.Name())
-		feedItems, err := os.ReadDir(feedPath)
-		if err != nil {
-			return 0, fmt.Errorf("cannot read feed %q: %w", feedEntry.Name(), err)
-		}
-
-		for _, itemEntry := range feedItems {
-			if isFeedMetadataFile(itemEntry.Name()) || !itemEntry.Type().IsRegular() {
-				continue
-			}
-
-			info, err := itemEntry.Info()
-			if err != nil {
-				return 0, fmt.Errorf("cannot stat feed item %q: %w", itemEntry.Name(), err)
-			}
-
-			item := storageItem{
-				feedName: feedEntry.Name(),
-				itemName: itemEntry.Name(),
-				path:     filepath.Join(feedPath, itemEntry.Name()),
-				size:     info.Size(),
-				modTime:  info.ModTime(),
-			}
-			items = append(items, item)
-			total += item.size
-		}
+		return 0, err
 	}
 
 	if total <= limit {
