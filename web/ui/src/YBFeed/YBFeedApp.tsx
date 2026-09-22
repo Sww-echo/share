@@ -18,7 +18,7 @@ function AppLayout() {
             <span className="brand-mark" aria-hidden="true">
               <svg viewBox="0 0 32 32" fill="none"><rect x="5" y="5" width="15" height="15" rx="4" stroke="currentColor" strokeWidth="2" opacity=".55" /><rect x="12" y="12" width="15" height="15" rx="4" fill="currentColor" /><path d="m17 19 2 2 4-4" stroke="var(--brand-mark-bg)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
-            <span>yb<span className="brand-light">Feed</span></span>
+            <span>Share<span className="brand-light">Box</span></span>
           </Link>
           <span className="header-tagline">你的随身共享空间</span>
           <div className="header-tools">
