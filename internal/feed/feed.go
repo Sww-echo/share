@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/ybizeul/ybfeed/pkg/yblog"
@@ -78,6 +79,7 @@ var fL = yblog.NewYBLogger("feed", []string{"DEBUG", "DEBUG_FEED"})
 var (
 	FeedErrorNotFound             = errors.New("feed not found")
 	FeedErrorInvalidSecret        = errors.New("invalid Secret")
+	FeedErrorInvalidSecretFormat  = errors.New("secret must be at least 4 characters")
 	FeedErrorIncorrectSecret      = errors.New("incorrect Secret")
 	FeedErrorAlreadyExists        = errors.New("feed already exists")
 	FeedErrorUnableToReadContent  = errors.New("unable to read feed content")
@@ -113,7 +115,15 @@ type NotificationSettings struct {
 // (to ybFeed binary) path to the directory where feed items will be stored.
 // The last directory of the path if the feed name.
 func NewFeed(feedPath string) (*Feed, error) {
+	return NewFeedWithSecret(feedPath, uuid.NewString())
+}
+
+// NewFeedWithSecret creates a feed with the caller-provided permanent secret.
+func NewFeedWithSecret(feedPath string, secret string) (*Feed, error) {
 	fL.Logger.Info("Creating new feed", slog.String("feed", feedPath))
+	if err := ValidateSecret(secret); err != nil {
+		return nil, err
+	}
 
 	// Return error if feed already exists
 	_, err := os.Stat(feedPath)
@@ -132,7 +142,7 @@ func NewFeed(feedPath string) (*Feed, error) {
 	feed := Feed{
 		Path: feedPath,
 		Config: FeedConfig{
-			Secret: uuid.NewString(),
+			Secret: secret,
 		},
 	}
 
@@ -145,6 +155,14 @@ func NewFeed(feedPath string) (*Feed, error) {
 	}
 
 	return &feed, nil
+}
+
+// ValidateSecret validates a permanent feed secret supplied during creation.
+func ValidateSecret(secret string) error {
+	if utf8.RuneCountInString(secret) < 4 {
+		return FeedErrorInvalidSecretFormat
+	}
+	return nil
 }
 
 // GetFeed returns the feed at feedPath, which is an absolute or relative (to
@@ -315,24 +333,16 @@ func (feed *Feed) GetItemData(item string) ([]byte, error) {
 	return content, nil
 }
 
-// IsSecretValid returns an error if the provided secret doesn't allow access
-// to the feed. secret can be a full secret or a PIN
+// IsSecretValid returns an error if the provided permanent secret doesn't
+// allow access to the feed.
 func (feed *Feed) IsSecretValid(secret string) error {
 	if secret == "" {
 		return FeedErrorInvalidSecret
 	}
 
-	if len(secret) == 4 { // Secret is a PIN
-		err := feed.Config.PIN.IsValid(secret)
-		if err != nil {
-			fL.Logger.Error(err.Error())
-			return err
-		}
-	} else {
-		if feed.Config.Secret != secret {
-			fL.Logger.Error(FeedErrorIncorrectSecret.Error())
-			return FeedErrorIncorrectSecret
-		}
+	if feed.Config.Secret != secret {
+		fL.Logger.Error(FeedErrorIncorrectSecret.Error())
+		return FeedErrorIncorrectSecret
 	}
 
 	return nil
@@ -475,14 +485,5 @@ func (f *Feed) RemoveItem(item string, notify bool) error {
 	}
 
 	fL.Logger.Debug("Removed Item", slog.String("name", item), slog.String("feed", f.Path))
-	return nil
-}
-
-// SetPIN configures the provided pin on the feed
-func (feed *Feed) SetPIN(pin string) error {
-	err := feed.Config.SetPIN(pin)
-	if err != nil {
-		return err
-	}
 	return nil
 }

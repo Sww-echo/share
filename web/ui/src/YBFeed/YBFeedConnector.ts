@@ -34,9 +34,16 @@ class YBFeedConnector {
             throw new YBFeedError(errorStatus(error) ?? 0, '暂时无法打开空间，请稍后重试。')
         }
     }
+    async CreateFeed(feedName: string, secret: string): Promise<void> {
+        try {
+            await Y.put('/feeds/' + encodeURIComponent(feedName), secret)
+        } catch (error) {
+            throw new YBFeedError(errorStatus(error) ?? 0, '空间创建失败，请稍后重试。')
+        }
+    }
     async AuthenticateFeed(feedName: string, secret: string): Promise<string> {
         const feed = await this.GetFeed(feedName, secret)
-        if (!feed.secret) throw new YBFeedError(401, 'PIN 不正确或已过期。')
+        if (!feed.secret) throw new YBFeedError(401, '密钥不正确。')
         return feed.secret
     }
     async GetItem(item: YBFeedItem): Promise<string> {
@@ -102,37 +109,6 @@ class YBFeedConnector {
         })
     }
 
-    async SetPIN(feedName: string, pin: string): Promise<boolean> {
-        return new Promise((resolve, reject) => {
-            Y.patch('/feeds/' + encodeURIComponent(feedName), pin)
-            .then(() => {
-                resolve(true)
-            })
-            .catch((error) => {
-                reject(new YBFeedError(error.status, "Error while setting PIN"))
-            })
-
-            // fetch(this.feedUrl(feedName),{
-            //     method: "PATCH",
-            //     credentials: "include",
-            //     body: pin
-            // })
-            // .then((f) => {
-            //     if (f.status !== 200) {
-            //         f.text().then((b) => {
-            //             reject(new YBFeedError(f.status, b))
-            //         })
-            //         .catch(() => {
-            //             reject(new YBFeedError(f.status, "Server Unavailable"))
-            //         })
-            //     }
-            //     resolve(true)
-            // })
-            // .catch((e) => {
-            //     reject(new YBFeedError(e.status, "Server Unavailable"))
-            // })
-        })
-    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async AddSubscription(feedName: string, subscription: any): Promise<boolean> {
         return new Promise((resolve, reject) => {

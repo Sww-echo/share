@@ -27,6 +27,8 @@ import (
 
 var hL = yblog.NewYBLogger("http", []string{"DEBUG", "DEBUG_HTTP"})
 
+const maxFeedSecretBodySize int64 = 1024 * 1024
+
 var webUiHandler = http.FileServer(http.FS(ui.GetUiFs()))
 
 // RootHandlerFunc figures out how to handle incoming HTTP requests.
@@ -194,8 +196,8 @@ func (api *ApiHandler) GetServer() *chi.Mux {
 	r.Get("/api/infos", api.getInfosHandler)
 	r.Route("/api/feeds", func(r chi.Router) {
 		r.Get("/{feedName}", api.feedGetFunc)
+		r.Put("/{feedName}", api.feedCreateFunc)
 		r.Post("/{feedName}", api.feedPostFunc)
-		r.Patch("/{feedName}", api.feedPatchFunc)
 		r.Post("/{feedName}/subscription", api.subscriptionPostFunc)
 		r.Delete("/{feedName}/subscription", api.subscriptionDeleteFunc)
 		r.Delete("/{feedName}/items", api.itemsDeleteFunc)
@@ -261,9 +263,7 @@ func (api *ApiHandler) feedWSHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, feed.FeedErrorNotFound):
 			closeCode = http.StatusNotFound + 4000
 		case errors.Is(err, feed.FeedErrorInvalidSecret),
-			errors.Is(err, feed.FeedErrorIncorrectSecret),
-			errors.Is(err, feed.FeedConfigErrorPinExpired),
-			errors.Is(err, feed.FeedConfigErrorPinIncorrect):
+			errors.Is(err, feed.FeedErrorIncorrectSecret):
 			closeCode = http.StatusUnauthorized + 4000
 		}
 		_ = c.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(closeCode, ""), time.Now().Add(time.Second))
@@ -291,26 +291,20 @@ func (api *ApiHandler) feedGetFunc(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if errors.Is(err, feed.FeedErrorNotFound) {
-			_, err = feed.NewFeed(path.Join(api.BasePath, feedName))
-			if err != nil {
-				utils.CloseWithCodeAndMessage(w, 500, err.Error())
-			}
-			f, _ = api.FeedManager.GetFeed(feedName)
+			utils.CloseWithCodeAndMessage(w, http.StatusNotFound, fmt.Sprintf("feed '%s' not found", feedName))
+			return
 		} else {
 			utils.CloseWithCodeAndMessage(w, 500, err.Error())
 			return
 		}
 	} else {
 		secret, _ := utils.GetSecret(r)
-		hL.Logger.Debug("secret", slog.String("secret", secret))
 
 		err = f.IsSecretValid(secret)
 		if err != nil {
 			switch {
 			case errors.Is(err, feed.FeedErrorInvalidSecret),
-				errors.Is(err, feed.FeedErrorIncorrectSecret),
-				errors.Is(err, feed.FeedConfigErrorPinExpired),
-				errors.Is(err, feed.FeedConfigErrorPinIncorrect):
+				errors.Is(err, feed.FeedErrorIncorrectSecret):
 				utils.CloseWithCodeAndMessage(w, 401, "Unauthorized")
 			default:
 				utils.CloseWithCodeAndMessage(w, 500, err.Error())
@@ -342,46 +336,34 @@ func (api *ApiHandler) feedGetFunc(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (api *ApiHandler) feedPatchFunc(w http.ResponseWriter, r *http.Request) {
-	hL.Logger.Debug("Feed API Set PIN request", slog.String("request_uri", r.RequestURI))
-	secret, _ := utils.GetSecret(r)
-
+func (api *ApiHandler) feedCreateFunc(w http.ResponseWriter, r *http.Request) {
 	feedName, _ := url.QueryUnescape(chi.URLParam(r, "feedName"))
 	if feedName == "" {
-		utils.CloseWithCodeAndMessage(w, 500, "Unable to obtain feed name")
+		utils.CloseWithCodeAndMessage(w, http.StatusBadRequest, "Unable to obtain feed name")
+		return
 	}
 
-	f, err := api.FeedManager.GetFeedWithAuth(feedName, secret)
-
+	secret, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxFeedSecretBodySize))
 	if err != nil {
-		switch {
-		case errors.Is(err, feed.FeedErrorNotFound):
-			utils.CloseWithCodeAndMessage(w, 404, fmt.Sprintf("feed '%s' not found", feedName))
-		case errors.Is(err, feed.FeedErrorInvalidSecret):
-			utils.CloseWithCodeAndMessage(w, 401, "Unauthorized")
-		default:
-			utils.CloseWithCodeAndMessage(w, 500, fmt.Sprintf("Error while getting feed: %s", err.Error()))
-		}
+		utils.CloseWithCodeAndMessage(w, http.StatusBadRequest, "Invalid secret")
 		return
 	}
-
-	pin, err := io.ReadAll(r.Body)
+	_, err = feed.NewFeedWithSecret(path.Join(api.BasePath, feedName), string(secret))
+	if errors.Is(err, feed.FeedErrorAlreadyExists) {
+		utils.CloseWithCodeAndMessage(w, http.StatusConflict, "Feed already exists")
+		return
+	}
+	if errors.Is(err, feed.FeedErrorInvalidSecretFormat) {
+		utils.CloseWithCodeAndMessage(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err != nil {
-		w.WriteHeader(500)
-		if _, err = w.Write([]byte(err.Error())); err != nil {
-			hL.Logger.Error("Error while writing HTTP response", slog.String("error", err.Error()))
-		}
+		utils.CloseWithCodeAndMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	if err = f.SetPIN(string(pin)); err != nil {
-		if errors.Is(err, feed.FeedConfigErrorPinIncorrectLength) {
-			utils.CloseWithCodeAndMessage(w, 400, "PIN should be 4 digits")
-		}
-		utils.CloseWithCodeAndMessage(w, 500, err.Error())
-		return
-	}
+	w.WriteHeader(http.StatusCreated)
 }
+
 func (api *ApiHandler) itemsDeleteFunc(w http.ResponseWriter, r *http.Request) {
 	hL.Logger.Debug("Item API EMPTY request", slog.String("request_uri", r.RequestURI))
 

@@ -1,14 +1,38 @@
 import { Button, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { useState } from 'react';
 import { IconArrowRight, IconCheck, IconDeviceLaptop, IconDeviceMobile, IconFileText, IconHash, IconPhoto, IconStack2 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { Connector } from './YBFeedConnector';
+import { errorMessage, errorStatus } from './feedback';
 
 export function YBFeedHome() {
   const navigate = useNavigate();
   const form = useForm({
-    initialValues: { feedName: '' },
-    validate: { feedName: (value) => /^[a-zA-Z0-9]+$/.test(value.trim()) ? null : '空间名称请使用英文字母或数字' },
+    initialValues: { feedName: '', secret: '' },
+    validate: {
+      feedName: (value) => /^[a-zA-Z0-9]+$/.test(value.trim()) ? null : '空间名称请使用英文字母或数字',
+      secret: (value) => value.length >= 4 ? null : '密钥至少需要 4 个字符',
+    },
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const openFeed = async ({ feedName, secret }: { feedName: string; secret: string }) => {
+    const name = feedName.trim();
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      try {
+        await Connector.CreateFeed(name, secret);
+      } catch (error) {
+        if (errorStatus(error) !== 409) throw error;
+        await Connector.GetFeed(name, secret);
+      }
+      navigate('/' + encodeURIComponent(name) + '?secret=' + encodeURIComponent(secret));
+    } catch (error) {
+      setSubmitError(errorStatus(error) === 401 ? '密钥不正确，请重新输入。' : errorMessage(error, '空间无法打开，请稍后重试。'));
+    } finally { setSubmitting(false); }
+  };
   return (
     <div className="home-page">
       <div className="home-intro">
@@ -21,11 +45,13 @@ export function YBFeedHome() {
           <span className="section-icon"><IconStack2 size={23} stroke={1.6} /></span>
           <h2>从一个空间开始</h2>
           <p className="muted">给空间起个名字，或回到已有的空间。</p>
-          <form onSubmit={form.onSubmit(({ feedName }) => navigate('/' + encodeURIComponent(feedName.trim())))}>
+          <form onSubmit={form.onSubmit(openFeed)}>
             <TextInput label="空间名称" placeholder="例如 work2026" size="md" leftSection={<IconHash size={18} />} autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} {...form.getInputProps('feedName')} />
-            <Button type="submit" size="md" fullWidth rightSection={<IconArrowRight size={18} />} mt="md">进入共享空间</Button>
+            <TextInput label="空间密钥" placeholder="输入至少 4 个字符的长期密钥" size="md" type="password" mt="md" autoCapitalize="none" autoCorrect="off" autoComplete="new-password" spellCheck={false} {...form.getInputProps('secret')} />
+            {submitError && <p className="pin-error" role="alert">{submitError}</p>}
+            <Button type="submit" size="md" fullWidth loading={submitting} rightSection={<IconArrowRight size={18} />} mt="md">创建或进入空间</Button>
           </form>
-          <p className="form-hint">新名称会自动创建空间。已有空间需通过分享链接或临时 PIN 验证。</p>
+          <p className="form-hint">新名称会使用此密钥创建空间；已有空间请输入原密钥进入。密钥不会过期，请妥善保存。</p>
         </div>
         <div className="home-visual" aria-hidden="true">
           <div className="device-label"><IconDeviceLaptop size={17} /> 从电脑，到手机</div>
@@ -41,7 +67,7 @@ export function YBFeedHome() {
       <div className="home-steps">
         <div><span>01</span><p><strong>打开空间</strong><small>一个好记的名字，就是入口</small></p></div>
         <div><span>02</span><p><strong>放入内容</strong><small>粘贴、输入，或拖入文件</small></p></div>
-        <div><span>03</span><p><strong>换端继续</strong><small>用链接或临时 PIN 连接设备</small></p></div>
+        <div><span>03</span><p><strong>换端继续</strong><small>使用同一个密钥连接设备</small></p></div>
       </div>
     </div>
   );

@@ -6,29 +6,18 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
 	"github.com/Appboy/webpush-go"
-	"golang.org/x/exp/slog"
 )
 
 var FeedConfigErrorCantWrite = errors.New("can't write feed configuration")
 var FeedConfigErrorNotFound = errors.New("feed configuration not found")
 var FeedConfigErrorInvalid = errors.New("feed configuration invalid")
-var FeedConfigErrorPinExpired = errors.New("feed pin expired")
-var FeedConfigErrorPinIncorrect = errors.New("feed pin incorrect")
-var FeedConfigErrorPinIncorrectLength = errors.New("feed pin length is not 4")
 
 type FeedConfig struct {
 	Secret        string `json:"secret"`
-	PIN           *PIN   `json:"pin,omitempty"`
 	Subscriptions []webpush.Subscription
 	feed          *Feed
-}
-
-type PIN struct {
-	PIN        string    `json:"pin,omitempty"`
-	Expiration time.Time `json:"expiration,omitempty"`
 }
 
 func (config *FeedConfig) migratev1v2() error {
@@ -41,31 +30,11 @@ func (config *FeedConfig) migratev1v2() error {
 		config.Secret = string(b)
 	}
 
-	pinPath := path.Join(config.feed.Path, "pin")
-	stat, err := os.Stat(pinPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-	} else {
-		pincode, err := os.ReadFile(pinPath)
-		if err != nil {
-			return err
-		}
-
-		pin := &PIN{
-			PIN:        string(pincode),
-			Expiration: stat.ModTime().Add(time.Minute * 2),
-		}
-		config.PIN = pin
-	}
-	err = config.Write()
-
-	if err != nil {
+	if err := config.Write(); err != nil {
 		return err
 	}
 	os.Remove(path.Join(config.feed.Path, "secret"))
-	os.Remove(pinPath)
+	os.Remove(path.Join(config.feed.Path, "pin"))
 	return nil
 }
 
@@ -115,22 +84,6 @@ func (config *FeedConfig) Write() error {
 	return nil
 }
 
-func (config *FeedConfig) SetPIN(s string) error {
-	if len(s) != 4 {
-		return FeedConfigErrorPinIncorrectLength
-	}
-	pin := &PIN{
-		PIN:        s,
-		Expiration: time.Now().Add(2 * time.Minute),
-	}
-	config.PIN = pin
-	err := config.Write()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (config *FeedConfig) AddSubscription(s webpush.Subscription) error {
 	for _, t := range config.Subscriptions {
 		if s.Endpoint == t.Endpoint && s.Keys.Auth == t.Keys.Auth && s.Keys.P256dh == t.Keys.P256dh {
@@ -159,17 +112,5 @@ func (config *FeedConfig) DeleteSubscription(s webpush.Subscription) error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (p *PIN) IsValid(s string) error {
-	if p.Expiration.Before(time.Now()) {
-		slog.Warn("PIN expired")
-		return FeedConfigErrorPinExpired
-	}
-	if s != p.PIN {
-		return FeedConfigErrorPinIncorrect
-	}
-
 	return nil
 }

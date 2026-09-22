@@ -6,7 +6,7 @@ export function errorStatus(error: unknown): number | undefined {
 
 export function errorMessage(error: unknown, fallback = '操作没有完成，请稍后重试。'): string {
   const status = errorStatus(error);
-  if (status === 401) return '空间验证已失效，请重新打开分享链接或输入 PIN。';
+  if (status === 401) return '空间验证已失效，请重新输入密钥。';
   if (status === 413) return '内容超过大小限制，请选择较小的文件。';
   if (status && status >= 500) return '暂时无法连接到空间，请稍后重试。';
   if (error instanceof DOMException && error.name === 'NotAllowedError') return '浏览器没有授予剪贴板权限，请在输入框内手动粘贴。';

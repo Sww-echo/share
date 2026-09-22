@@ -6,6 +6,17 @@ import (
 	"testing"
 )
 
+func TestValidateSecret(t *testing.T) {
+	for _, secret := range []string{"1234", "  1 2 3 4  ", "密钥🔐四"} {
+		if err := ValidateSecret(secret); err != nil {
+			t.Errorf("ValidateSecret(%q) returned error: %v", secret, err)
+		}
+	}
+	if err := ValidateSecret("123"); err == nil {
+		t.Error("ValidateSecret accepted a secret shorter than four characters")
+	}
+}
+
 func TestGetFeedItemData(t *testing.T) {
 	t.Cleanup(func() {
 		os.RemoveAll("tests/feed1")

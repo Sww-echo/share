@@ -6,7 +6,7 @@ import { YBPasteCardComponent } from './Components/YBPasteCardComponent';
 import { YBFeedItemsComponent } from './Components/YBFeedItemsComponent';
 import type { ConnectionStatus } from './Components/YBFeedItemsComponent';
 import { YBNotificationToggleComponent } from './Components/YBNotificationToggleComponent';
-import { PinRequest } from './Components/PinRequest';
+import { SecretRequest } from './Components/SecretRequest';
 import { ShareModal } from './Components/ShareModal';
 import { Connector } from './YBFeedConnector';
 import type { YBFeed } from './YBFeed';
@@ -92,16 +92,16 @@ function FeedWorkspace({ feedName }: { feedName: string }) {
   }, [feedName]);
 
   const unauthorized = useCallback(() => { setFeed(null); setAccess('locked'); }, []);
-  const sendPIN = async (pin: string) => {
+  const sendSecret = async (secret: string) => {
     try {
-      const result = await Connector.GetFeed(feedName, pin);
-      if (!result.secret) throw new Error('PIN 不正确或已过期，请重新确认。');
+      const result = await Connector.GetFeed(feedName, secret);
+      if (!result.secret) throw new Error('密钥不正确，请重新确认。');
       setFeed(result);
       setCount(result.items?.length || 0);
       setAccess('ready');
       if (urlSecret) navigate('/' + encodeURIComponent(feedName), { replace: true });
     } catch (error) {
-      if (errorStatus(error) === 401) throw new Error('PIN 不正确或已过期，请重新确认。');
+      if (errorStatus(error) === 401) throw new Error('密钥不正确，请重新确认。');
       throw error;
     }
   };
@@ -117,7 +117,7 @@ function FeedWorkspace({ feedName }: { feedName: string }) {
     finally { setEmptying(false); }
   };
 
-  if (access === 'locked') return <PinRequest feedName={feedName} sendPIN={sendPIN} />;
+  if (access === 'locked') return <SecretRequest feedName={feedName} sendSecret={sendSecret} />;
   if (access === 'error') return <div className="access-page"><div className="access-card">
     <span className="section-icon"><IconWifiOff size={24} /></span><h1>暂时无法打开空间</h1>
     <p>连接似乎中断了。请确认服务可用后，再试一次。</p>

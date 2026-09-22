@@ -57,7 +57,7 @@ func (t APITestRequest) performRequest() (*http.Response, error) {
 		authQuery = "?secret=" + badSecret
 	}
 
-	path := "/api/feed/"
+	path := "/api/feeds/"
 	if t.feed == "" {
 		path = path + url.QueryEscape(testFeedName)
 	} else {
@@ -134,31 +134,20 @@ func TestServiceWorker(t *testing.T) {
 
 func TestCreateFeed(t *testing.T) {
 	const feedName = "6ff1146b6830 #86b8f59f550189a8f91f"
+	const secret = "create-feed-secret"
 
 	t.Cleanup(func() {
 		os.RemoveAll(path.Join(baseDir, dataDir, feedName))
 	})
 
 	res, _ := APITestRequest{
-		method: http.MethodGet,
+		method: http.MethodPut,
 		feed:   feedName,
-		body:   nil,
+		body:   bytes.NewBufferString(secret),
 	}.performRequest()
 
-	if res.StatusCode != 200 {
-		t.Errorf("Expect code 200 but got %d", res.StatusCode)
-	}
-
-	// Read cookie
-	cookies := res.Cookies()
-	found := false
-	fmt.Println(cookies)
-	for _, c := range cookies {
-		found = (c.Name == "Secret")
-	}
-
-	if found == false {
-		t.Errorf("Cookie is not present in reply")
+	if res.StatusCode != http.StatusCreated {
+		t.Errorf("Expect code %d but got %d", http.StatusCreated, res.StatusCode)
 	}
 }
 
@@ -291,83 +280,6 @@ func TestGetFeedItemNonExistent(t *testing.T) {
 			t.Errorf("Expect code 400 but got %d (%s)", res.StatusCode, err.Error())
 		}
 		t.Errorf("Expect code 404 but got %d (%s)", res.StatusCode, string(b))
-	}
-}
-
-func TestSetPinNoCredentials(t *testing.T) {
-	const pin = "1234"
-
-	buf := bytes.NewBuffer([]byte(pin))
-
-	res, _ := APITestRequest{
-		method: http.MethodPatch,
-		body:   buf,
-	}.performRequest()
-
-	if res.StatusCode != 401 {
-		t.Errorf("Expect code 401 but got %d", res.StatusCode)
-	}
-}
-
-func TestSetPin(t *testing.T) {
-	t.Cleanup(func() {
-		c, _ := feed.FeedConfigForFeed(
-			&feed.Feed{
-				Path: path.Join(baseDir, dataDir, testFeedName),
-			},
-		)
-		c.PIN = nil
-		_ = c.Write()
-	})
-
-	const pin = "1234"
-
-	buf := bytes.NewBuffer([]byte(pin))
-
-	res, _ := APITestRequest{
-		method:         http.MethodPatch,
-		body:           buf,
-		cookieAuthType: AuthTypeAuth,
-	}.performRequest()
-
-	if res.StatusCode != 200 {
-		t.Errorf("Expect code 200 but got %d", res.StatusCode)
-	}
-
-	c, err := feed.FeedConfigForFeed(
-		&feed.Feed{
-			Path: path.Join(baseDir, dataDir, testFeedName),
-		},
-	)
-
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-	pin_written := c.PIN.PIN
-
-	if pin_written != pin {
-		t.Errorf("Expected PIN %s but got %s", pin, pin_written)
-	}
-}
-
-func TestSetBadPin(t *testing.T) {
-	pinPath := path.Join(baseDir, dataDir, testFeedName, "pin")
-	t.Cleanup(func() {
-		os.Remove(pinPath)
-	})
-
-	const pin = "123"
-
-	buf := bytes.NewBuffer([]byte(pin))
-
-	res, _ := APITestRequest{
-		method:         http.MethodPatch,
-		body:           buf,
-		cookieAuthType: AuthTypeAuth,
-	}.performRequest()
-
-	if res.StatusCode != 400 {
-		t.Errorf("Expect code 400 but got %d", res.StatusCode)
 	}
 }
 

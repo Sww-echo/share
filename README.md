@@ -20,8 +20,8 @@ You can then decide to share the feed two different ways :
 
 - Copy a secret link to the feed, that you can paste on a different computer,
 you will be automatically authenticated
-- Set a temporary 4 digit PIN. You then go to another computer and open the
-feed. You will be prompted for the PIN to unlock it.
+- Set a permanent secret when creating a space. You can then open the space
+on another computer with the same secret.
 
 ### Screenshot
 
@@ -42,7 +42,7 @@ there is no easy way to retrieve the feed (you can get it back from the
 `config.json` file in the feed directory)
 - Most modern browser won't honor long cookie lifetime, you might have to
 recover the secret from `config.json` if it happens.
-- Security could probably be improved, tokens and PINs are stored in clear on
+- Security could probably be improved, tokens and secrets are stored in clear on
 the filesystem
 - No rate control, so it is still exposed to flooding; upload size and
   retained data size can be configured with environment variables.
