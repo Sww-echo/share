@@ -33,9 +33,16 @@ jobs:
         working-directory: ./web/ui
       - run: npm run build
         working-directory: ./web/ui
+      - run: git restore --source=HEAD -- web/ui/yarn.lock
 
       # Build docker image
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: ko-build/setup-ko@v0.6
       - run: GOFLAGS="-ldflags=-X=main.version=$YBFEED_VERSION" ko build -B --platform all --tags dev --sbom none ./cmd/ybfeed
         env:
-          KO_DOCKER_REPO: ghcr.io/ybizeul
+          KO_DOCKER_REPO: ghcr.io/sww-echo/share
