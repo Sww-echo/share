@@ -87,8 +87,8 @@ function FeedWorkspace({ feedName }: { feedName: string }) {
   }, [feedName, urlSecret, navigate, retry]);
 
   useEffect(() => {
-    document.title = feedName + ' · ybFeed';
-    return () => { document.title = 'ybFeed · 你的随身共享空间'; };
+    document.title = feedName + ' · ShareBox';
+    return () => { document.title = 'ShareBox · 你的随身共享空间'; };
   }, [feedName]);
 
   const unauthorized = useCallback(() => { setFeed(null); setAccess('locked'); }, []);

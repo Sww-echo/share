@@ -21,7 +21,7 @@ var logLevel slog.LevelVar
 func main() {
 	logLevel.Set(slog.LevelInfo)
 	app := &cli.App{
-		Name:    "ybFeed",
+		Name:    "sharebox",
 		Version: version,
 		Usage:   "Microfeeds for personal use",
 		Flags: []cli.Flag{

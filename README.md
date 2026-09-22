@@ -1,6 +1,6 @@
 ### Introduction
 
-**ybFeed** is a personal micro feed where you can post snippets of 
+**ShareBox** is a personal micro feed where you can post snippets of
 text or images.
 
 The primary use case is to share information between computers when you don't
@@ -11,7 +11,7 @@ be kept in sync when you add or remove items.
 
 ### Concepts
 
-On ybFeed home page, you are invited to create a feed with a unique name.
+On the ShareBox home page, you are invited to create a feed with a unique name.
 
 Once on a feed, you can paste data in it, text or images, they will be
 displayed with the newest items at the top.
@@ -37,7 +37,7 @@ Here are some I already identified :
 
 - Paste might not work over non secured connections (https), this is a
 limitation as a security measure with some web browsers
-- ybFeed relies on a cookie to authenticate a session, if the cookie is lost
+- ShareBox relies on a cookie to authenticate a session, if the cookie is lost
 there is no easy way to retrieve the feed (you can get it back from the
 `config.json` file in the feed directory)
 - Most modern browser won't honor long cookie lifetime, you might have to
@@ -134,10 +134,10 @@ npm run build
 
 # Build Go binary
 cd ../../
-go build -o ybFeed cmd/ybfeed/*.go
+go build -o sharebox cmd/ybfeed/*.go
 
-# Run ybFeed
-./ybFeed
+# Run ShareBox
+./sharebox
 
 # Point your browser to port http://localhost:8080
 ```

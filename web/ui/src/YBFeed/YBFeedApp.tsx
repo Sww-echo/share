@@ -14,7 +14,7 @@ function AppLayout() {
       <a className="skip-link" href="#main-content">跳转到主要内容</a>
       <header className="app-header">
         <div className="header-inner">
-          <Link to="/" className="brand" aria-label="ybFeed 首页">
+          <Link to="/" className="brand" aria-label="ShareBox 首页">
             <span className="brand-mark" aria-hidden="true">
               <svg viewBox="0 0 32 32" fill="none"><rect x="5" y="5" width="15" height="15" rx="4" stroke="currentColor" strokeWidth="2" opacity=".55" /><rect x="12" y="12" width="15" height="15" rx="4" fill="currentColor" /><path d="m17 19 2 2 4-4" stroke="var(--brand-mark-bg)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
@@ -33,7 +33,7 @@ function AppLayout() {
       </header>
       <main id="main-content" className="app-main"><Outlet /></main>
       <footer className="app-footer">
-        <span>ybFeed <span className="footer-dot">·</span> 内容随你，自在流动</span>
+        <span>ShareBox <span className="footer-dot">·</span> 内容随你，自在流动</span>
         <YBFeedVersionComponent />
       </footer>
     </div>

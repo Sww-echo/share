@@ -204,7 +204,7 @@ func (api *ApiHandler) GetServer() *chi.Mux {
 	})
 	r.Get("/*", RootHandlerFunc)
 
-	slog.Info("ybFeed starting",
+	slog.Info("ShareBox starting",
 		slog.String("version", api.Version),
 		slog.String("data_dir", api.BasePath),
 		slog.Int("port", api.HttpPort),
