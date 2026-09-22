@@ -2,10 +2,11 @@ services:
   ybYaml:
     image: ybfeed:latest
     build: .
+    restart: unless-stopped
     environment:
       YBF_DATA_DIR: /data
       YBF_MAX_DATA_SIZE: ${YBF_MAX_DATA_SIZE:-10240}
     volumes:
       - ./data:/data
     ports:
-      - 8080:8080
+      - 127.0.0.1:39761:8080
