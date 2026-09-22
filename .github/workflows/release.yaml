@@ -29,11 +29,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 22.x
-      - run: corepack enable
+      - run: npm ci --legacy-peer-deps
         working-directory: ./web/ui
-      - run: yarn
-        working-directory: ./web/ui
-      - run: yarn build
+      - run: npm run build
         working-directory: ./web/ui
 
 
